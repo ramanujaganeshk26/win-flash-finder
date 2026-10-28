@@ -35,6 +35,3 @@ python -m win_flash_finder.cli . -d 2
 ```bash
 python -m unittest discover tests
 ```
-
----
-_This project was scaffolded with the help of an AI agent._
