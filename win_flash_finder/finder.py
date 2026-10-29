@@ -3,7 +3,7 @@ import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Any, Optional, Set
 
-SPECIAL_PRESETS = {
+SPECIAL_PRESETS: Dict[str, List[str]] = {
     "pdf": [".pdf"],
     "pth": [".pth"],
     "docs": [".docx", ".doc", ".pdf", ".rtf", ".txt", ".odt", ".xlsx", ".pptx"],
@@ -12,16 +12,43 @@ SPECIAL_PRESETS = {
 }
 
 class FlashFinder:
-    def __init__(self, max_workers: int = 16, skip_hidden: bool = True):
-        self.max_workers = max_workers
-        self.skip_hidden = skip_hidden
+    """An ultra-fast multithreaded file search utility for scanning directories and filtering by presets, extensions, or regex patterns."""
 
-    def _scan_dir(self, directory: str, extensions: Optional[Set[str]], pattern: Optional[re.Pattern], depth: int, max_depth: int) -> List[Dict[str, Any]]:
-        results = []
+    def __init__(self, max_workers: int = 16, skip_hidden: bool = True) -> None:
+        """Initialize the FlashFinder.
+
+        Args:
+            max_workers: Maximum number of worker threads to use for concurrent scanning.
+            skip_hidden: Whether to skip hidden and system files/directories.
+        """
+        self.max_workers: int = max_workers
+        self.skip_hidden: bool = skip_hidden
+
+    def _scan_dir(
+        self, 
+        directory: str, 
+        extensions: Optional[Set[str]], 
+        pattern: Optional[re.Pattern], 
+        depth: int, 
+        max_depth: int
+    ) -> List[Dict[str, Any]]:
+        """Recursively scan a directory using a thread pool for subdirectories.
+
+        Args:
+            directory: The directory path to scan.
+            extensions: A set of file extensions to filter by.
+            pattern: A compiled regular expression pattern to match filenames.
+            depth: Current recursion depth.
+            max_depth: Maximum recursion depth allowed (-1 for unlimited).
+
+        Returns:
+            A list of dictionaries containing file metadata (path, name, size, mtime, extension).
+        """
+        results: List[Dict[str, Any]] = []
         if max_depth != -1 and depth > max_depth:
             return results
 
-        subdirs = []
+        subdirs: List[str] = []
         try:
             with os.scandir(directory) as entries:
                 for entry in entries:
@@ -65,8 +92,27 @@ class FlashFinder:
 
         return results
 
-    def find(self, root_dir: str, target_preset: Optional[str] = None, ext_list: Optional[List[str]] = None, pattern_str: Optional[str] = None, max_depth: int = -1) -> List[Dict[str, Any]]:
-        extensions = set()
+    def find(
+        self, 
+        root_dir: str, 
+        target_preset: Optional[str] = None, 
+        ext_list: Optional[List[str]] = None, 
+        pattern_str: Optional[str] = None, 
+        max_depth: int = -1
+    ) -> List[Dict[str, Any]]:
+        """Search for files starting from a root directory using optional presets, extensions, or name patterns.
+
+        Args:
+            root_dir: The root directory to start searching from.
+            target_preset: A specialized preset key (e.g., 'pdf', 'docs', 'code').
+            ext_list: An optional list of specific file extensions to filter by.
+            pattern_str: An optional regular expression string pattern to match filenames.
+            max_depth: Maximum recursion depth (-1 for unlimited).
+
+        Returns:
+            A list of matching file records.
+        """
+        extensions: Set[str] = set()
         if target_preset and target_preset in SPECIAL_PRESETS:
             extensions.update(SPECIAL_PRESETS[target_preset])
         if ext_list:
@@ -76,7 +122,7 @@ class FlashFinder:
                     e = '.' + e
                 extensions.add(e)
 
-        ext_filter = extensions if extensions else None
-        pattern = re.compile(pattern_str, re.IGNORECASE) if pattern_str else None
+        ext_filter: Optional[Set[str]] = extensions if extensions else None
+        pattern: Optional[re.Pattern] = re.compile(pattern_str, re.IGNORECASE) if pattern_str else None
         root_path = os.path.abspath(root_dir)
         return self._scan_dir(root_path, ext_filter, pattern, depth=0, max_depth=max_depth)
